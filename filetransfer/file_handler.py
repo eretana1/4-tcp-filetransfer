@@ -3,8 +3,10 @@ import os
 
 
 # Sends a file through the given socket
-# Receives a socket, and a byte message
-def send_file(sock, filename):
+# Receives a socket, and a byte message and thread lock
+def send_file(sock, filename, lock):
+    lock.acquire()   # Get the current lock for thread
+
     try:
         # [4 bytes of file name size] [file name] [4 bytes of content size] [content]
         b_file = open(filename, 'rb')
@@ -20,8 +22,10 @@ def send_file(sock, filename):
         
     except FileNotFoundError:
         os.write(1, f'{filename}: File not found. Please try again.'.encode())
-        sock.sendall('')
+        sock.sendall(b'')
 
+    lock.release() #File transfer is completed, release lock for thread
+    
 
 def recv_all(sock, msg_len) -> bytearray:
     # Read message consistently from socket
@@ -64,6 +68,13 @@ def receive_file(sock):
 
     # Create new file in directory
     filename = b_file_name.decode().split('/')[-1]
+
+    version = 1 
+    while os.path.exists(f'client_files/{filename}'):
+        filename = filename.split('.')[0].split('(')[0] + (f'({version})') + '.' + filename.split('.')[1]
+        version += 1
+        
+        
     with open(f'client_files/{filename}', 'wb') as transferred_file:
         transferred_file.write(b_content)
     
